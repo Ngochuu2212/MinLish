@@ -1,5 +1,6 @@
 package com.example.english_app.data.repository
 
+import com.example.english_app.data.local.dao.UserDao
 import com.example.english_app.data.local.dao.VocabularySetDao
 import com.example.english_app.data.local.dao.WordDao
 import com.example.english_app.data.local.entity.VocabularySetEntity
@@ -8,7 +9,8 @@ import kotlinx.coroutines.flow.Flow
 
 class VocabularyRepository(
     private val setDao: VocabularySetDao,
-    private val wordDao: WordDao
+    private val wordDao: WordDao,
+    private val userDao: UserDao
 ) {
     fun observeSets(userId: Int): Flow<List<VocabularySetEntity>> =
         setDao.observeByUserId(userId)
@@ -62,5 +64,9 @@ class VocabularyRepository(
     suspend fun countWordsByUser(userId: Int): Int = wordDao.countByUserId(userId)
 
     suspend fun importWords(words: List<WordEntity>) = wordDao.insertAll(words)
+
+    /** Lấy dailyWordCount của user để dùng cho daily review limit */
+    suspend fun getUserDailyWordCount(userId: Int): Int =
+        userDao.getDailyWordCount(userId) ?: 20
 }
 

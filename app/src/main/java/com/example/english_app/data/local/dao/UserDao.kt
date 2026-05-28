@@ -23,5 +23,8 @@ interface UserDao {
 
     @Query("UPDATE users SET streak = :streak, lastStudyDate = :lastStudyDate WHERE id = :userId")
     suspend fun updateStreak(userId: Int, streak: Int, lastStudyDate: Long)
+
+    @Query("SELECT dailyWordCount FROM users WHERE id = :userId LIMIT 1")
+    suspend fun getDailyWordCount(userId: Int): Int?
 }
 

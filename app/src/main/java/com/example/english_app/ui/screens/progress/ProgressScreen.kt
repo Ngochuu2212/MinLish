@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.english_app.data.repository.ProgressStats
 import com.example.english_app.ui.theme.*
+import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -229,6 +230,13 @@ fun WeeklyBarChart(activity: Map<String, Int>, modifier: Modifier = Modifier) {
     }
     val maxVal = (values.maxOrNull() ?: 1).coerceAtLeast(1)
 
+    // Tính index ngày hôm nay trong tuần (Mon=0 … Sun=6)
+    val todayIdx = run {
+        val cal = Calendar.getInstance()
+        // Calendar.DAY_OF_WEEK: Sun=1, Mon=2, …, Sat=7 → chuyển về Mon=0..Sun=6
+        (cal.get(Calendar.DAY_OF_WEEK) + 5) % 7
+    }
+
     Column(modifier = modifier) {
         Row(
             modifier = Modifier.fillMaxWidth().height(120.dp),
@@ -237,9 +245,8 @@ fun WeeklyBarChart(activity: Map<String, Int>, modifier: Modifier = Modifier) {
         ) {
             days.forEachIndexed { idx, day ->
                 val v = values.getOrElse(idx) { 0 }
-                val isToday = idx == 3 // highlight Thursday like Figma
+                val isToday = idx == todayIdx
                 val heightFraction = if (maxVal > 0) v.toFloat() / maxVal else 0f
-                val minH = 4.dp
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Bottom,
@@ -257,8 +264,12 @@ fun WeeklyBarChart(activity: Map<String, Int>, modifier: Modifier = Modifier) {
         }
         Spacer(Modifier.height(6.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            days.forEach { day ->
-                Text(day, fontSize = 10.sp, color = TextSecondary, fontWeight = FontWeight.Medium)
+            days.forEachIndexed { idx, day ->
+                Text(
+                    day, fontSize = 10.sp,
+                    color = if (idx == todayIdx) NavyPrimary else TextSecondary,
+                    fontWeight = if (idx == todayIdx) FontWeight.Bold else FontWeight.Medium
+                )
             }
         }
     }

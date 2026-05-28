@@ -18,7 +18,7 @@ class MinLishApp : Application() {
     }
 
     val vocabularyRepository by lazy {
-        VocabularyRepository(database.vocabularySetDao(), database.wordDao())
+        VocabularyRepository(database.vocabularySetDao(), database.wordDao(), database.userDao())
     }
 
     val learningRepository by lazy {

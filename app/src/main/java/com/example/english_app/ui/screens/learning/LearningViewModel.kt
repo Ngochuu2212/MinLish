@@ -93,7 +93,11 @@ class LearningViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val uid = awaitValidUserId()
-            val due = learningRepository.getDueSession(uid, 20)
+            // Dùng dailyWordCount của user nếu có, mặc định 20
+            val dailyLimit = try {
+                vocabularyRepository.getUserDailyWordCount(uid)
+            } catch (e: Exception) { 20 }
+            val due = learningRepository.getDueSession(uid, dailyLimit)
             _uiState.update {
                 it.copy(
                     sessionWords = due,
