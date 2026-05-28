@@ -21,6 +21,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,12 +43,64 @@ fun RegisterScreen(
     var localError by remember { mutableStateOf<String?>(null) }
     val focusManager = LocalFocusManager.current
 
-    LaunchedEffect(uiState.success) { if (uiState.success) onRegisterSuccess() }
-
     val fieldColors = OutlinedTextFieldDefaults.colors(
         unfocusedBorderColor = Color(0xFFE5E7EB), focusedBorderColor = NavyPrimary
     )
 
+    // ── Verification email sent — show success card ──────────────────────────
+    if (uiState.verificationSent) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(SurfaceWhite)
+                .padding(horizontal = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text("📧", fontSize = 64.sp)
+            Spacer(Modifier.height(20.dp))
+            Text(
+                "Verify Your Email",
+                fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextPrimary,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "A verification link has been sent to\n$email\n\nPlease check your inbox (and spam folder) and click the link to activate your account.",
+                fontSize = 14.sp, color = TextSecondary,
+                textAlign = TextAlign.Center, lineHeight = 21.sp
+            )
+            Spacer(Modifier.height(32.dp))
+            Button(
+                onClick = { viewModel.clearSuccess(); onNavigateToLogin() },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = NavyPrimary)
+            ) {
+                Text("Go to Sign In", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = { viewModel.resendVerificationEmail(email, password) },
+                enabled = !uiState.isLoading,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = NavyPrimary)
+            ) {
+                if (uiState.isLoading)
+                    CircularProgressIndicator(Modifier.size(20.dp), color = NavyPrimary, strokeWidth = 2.dp)
+                else
+                    Text("Resend Verification Email", fontSize = 14.sp)
+            }
+            if (uiState.error != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(uiState.error!!, color = ErrorRed, fontSize = 13.sp, textAlign = TextAlign.Center)
+            }
+        }
+        return
+    }
+
+    // ── Registration form ─────────────────────────────────────────────────────
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -66,8 +119,6 @@ fun RegisterScreen(
             modifier = Modifier.fillMaxWidth())
         Text("Start your vocabulary journey", fontSize = 14.sp, color = TextSecondary,
             modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 28.dp))
-
-        fun field(label: String) = Modifier.fillMaxWidth()
 
         LabeledField("Full Name") {
             OutlinedTextField(value = name, onValueChange = { name = it },

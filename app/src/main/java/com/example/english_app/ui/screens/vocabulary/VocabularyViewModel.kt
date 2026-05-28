@@ -1,5 +1,9 @@
 package com.example.english_app.ui.screens.vocabulary
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -8,8 +12,10 @@ import com.example.english_app.data.local.entity.WordEntity
 import com.example.english_app.data.repository.AuthRepository
 import com.example.english_app.data.repository.LearningRepository
 import com.example.english_app.data.repository.VocabularyRepository
+import com.example.english_app.utils.CsvHelper
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.io.File
 
 data class VocabSetWithCount(val set: VocabularySetEntity, val wordCount: Int)
 
@@ -20,7 +26,11 @@ data class VocabularyUiState(
     val selectedWord: WordEntity? = null,
     val isLoading: Boolean = true,
     val error: String? = null,
-    val actionSuccess: Boolean = false
+    val actionSuccess: Boolean = false,
+    // Import/Export
+    val importedCount: Int? = null,   // null = not imported yet, >0 = success count
+    val importError: String? = null,
+    val isImporting: Boolean = false
 )
 
 class VocabularyViewModel(
@@ -145,6 +155,80 @@ class VocabularyViewModel(
 
     fun clearError() = _uiState.update { it.copy(error = null) }
     fun clearSuccess() = _uiState.update { it.copy(actionSuccess = false) }
+    fun clearImportResult() = _uiState.update { it.copy(importedCount = null, importError = null) }
+
+    // ── Import from CSV ───────────────────────────────────────────────────────
+    fun importFromCsv(context: Context, uri: Uri, setId: Int) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isImporting = true, importError = null, importedCount = null) }
+            try {
+                val csvContent = context.contentResolver.openInputStream(uri)
+                    ?.bufferedReader()?.readText()
+                    ?: run {
+                        _uiState.update { it.copy(isImporting = false, importError = "Cannot read file") }
+                        return@launch
+                    }
+                val words = CsvHelper.parseWords(csvContent, setId)
+                if (words.isEmpty()) {
+                    _uiState.update { it.copy(isImporting = false, importError = "No valid words found.\nMake sure columns: word, meaning are filled.") }
+                    return@launch
+                }
+                vocabularyRepository.importWords(words)
+                learningRepository.initializeWordsForUser(currentUserId, setId)
+                _uiState.update { it.copy(isImporting = false, importedCount = words.size) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isImporting = false, importError = "Import failed: ${e.message}") }
+            }
+        }
+    }
+
+    // ── Export to CSV ─────────────────────────────────────────────────────────
+    fun exportToCsv(context: Context, setId: Int) {
+        viewModelScope.launch {
+            try {
+                val set = vocabularyRepository.getSetById(setId) ?: return@launch
+                val words = vocabularyRepository.getWords(setId)
+                if (words.isEmpty()) {
+                    _uiState.update { it.copy(error = "No words to export") }
+                    return@launch
+                }
+                val csvContent = CsvHelper.exportToCsv(words)
+                val safeName = set.name.replace(Regex("[^a-zA-Z0-9_\\-]"), "_")
+                val file = File(context.cacheDir, "${safeName}.csv")
+                file.writeText(csvContent, Charsets.UTF_8)
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/csv"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_SUBJECT, "Vocabulary: ${set.name}")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(intent, "Export \"${set.name}\""))
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Export failed: ${e.message}") }
+            }
+        }
+    }
+
+    // ── Download CSV template ─────────────────────────────────────────────────
+    fun downloadTemplate(context: Context) {
+        viewModelScope.launch {
+            try {
+                val file = File(context.cacheDir, "vocabulary_template.csv")
+                file.writeText(CsvHelper.buildTemplate(), Charsets.UTF_8)
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/csv"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_SUBJECT, "MinLish - Vocabulary Import Template")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(intent, "Save Template"))
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Failed: ${e.message}") }
+            }
+        }
+    }
 }
 
 class VocabularyViewModelFactory(

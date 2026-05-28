@@ -13,7 +13,20 @@ import kotlinx.coroutines.launch
 data class AuthUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
-    val success: Boolean = false
+    val success: Boolean = false,
+    /** Sau khi đăng ký hoặc resend — email xác minh / reset đã được gửi */
+    val verificationSent: Boolean = false,
+    /** Login thất bại vì email chưa được xác minh */
+    val emailNotVerified: Boolean = false
+)
+
+/**
+ * Trạng thái Forgot Password — Firebase gửi reset link qua email, 1 bước.
+ */
+data class ForgotPasswordState(
+    val isLoading: Boolean = false,
+    val emailSent: Boolean = false,
+    val error: String? = null
 )
 
 class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
@@ -23,59 +36,91 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
+    private val _forgotState = MutableStateFlow(ForgotPasswordState())
+    val forgotState: StateFlow<ForgotPasswordState> = _forgotState.asStateFlow()
+
+    // ── Login ────────────────────────────────────────────────────────────────
     fun login(email: String, password: String) {
         viewModelScope.launch {
             _uiState.value = AuthUiState(isLoading = true)
-            val result = authRepository.login(email, password)
-            _uiState.value = when (result) {
-                is AuthResult.Success -> AuthUiState(success = true)
-                is AuthResult.Error -> AuthUiState(error = result.message)
+            when (val result = authRepository.login(email, password)) {
+                is AuthResult.Success       -> _uiState.value = AuthUiState(success = true)
+                is AuthResult.Error         -> _uiState.value = AuthUiState(error = result.message)
+                is AuthResult.EmailNotVerified ->
+                    _uiState.value = AuthUiState(emailNotVerified = true,
+                        error = "Your email is not verified yet. Please check your inbox.")
+                else -> _uiState.value = AuthUiState(error = "Unexpected error")
             }
         }
     }
 
+    // ── Register ─────────────────────────────────────────────────────────────
     fun register(name: String, email: String, password: String) {
         viewModelScope.launch {
             _uiState.value = AuthUiState(isLoading = true)
-            val result = authRepository.register(name, email, password)
-            _uiState.value = when (result) {
-                is AuthResult.Success -> AuthUiState(success = true)
-                is AuthResult.Error -> AuthUiState(error = result.message)
+            when (val result = authRepository.register(name, email, password)) {
+                is AuthResult.VerificationEmailSent ->
+                    _uiState.value = AuthUiState(verificationSent = true)
+                is AuthResult.Error ->
+                    _uiState.value = AuthUiState(error = result.message)
+                else -> _uiState.value = AuthUiState(error = "Unexpected error")
             }
         }
     }
 
+    // ── Resend verification email ─────────────────────────────────────────────
+    fun resendVerificationEmail(email: String, password: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            when (val result = authRepository.resendVerificationEmail(email, password)) {
+                is AuthResult.VerificationEmailSent ->
+                    _uiState.value = AuthUiState(verificationSent = true)
+                is AuthResult.Error ->
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = result.message)
+                else -> _uiState.value = _uiState.value.copy(isLoading = false)
+            }
+        }
+    }
+
+    // ── Logout ───────────────────────────────────────────────────────────────
     fun logout() {
         viewModelScope.launch {
             authRepository.logout()
-            // Reset UI state sau khi logout để tránh LaunchedEffect(uiState.success)
-            // trong LoginScreen tự động gọi onLoginSuccess() khi màn hình Login được show lại
             _uiState.value = AuthUiState()
         }
     }
 
+    // ── Google Sign-In ───────────────────────────────────────────────────────
     fun loginWithGoogle(idToken: String) {
         viewModelScope.launch {
             _uiState.value = AuthUiState(isLoading = true)
-            val result = authRepository.loginWithGoogle(idToken)
-            _uiState.value = when (result) {
-                is AuthResult.Success -> AuthUiState(success = true)
-                is AuthResult.Error -> AuthUiState(error = result.message)
+            when (val result = authRepository.loginWithGoogle(idToken)) {
+                is AuthResult.Success -> _uiState.value = AuthUiState(success = true)
+                is AuthResult.Error   -> _uiState.value = AuthUiState(error = result.message)
+                else -> _uiState.value = AuthUiState(error = "Unexpected error")
             }
         }
     }
 
-    fun clearError() {
-        _uiState.value = _uiState.value.copy(error = null)
+    fun clearError()                 { _uiState.value = _uiState.value.copy(error = null) }
+    fun setGoogleError(msg: String)  { _uiState.value = AuthUiState(error = msg) }
+    fun clearSuccess()               { _uiState.value = AuthUiState() }
+
+    // ── Forgot Password — Firebase gửi reset link 1 bước ─────────────────────
+    fun forgotSendResetEmail(email: String) {
+        viewModelScope.launch {
+            _forgotState.value = ForgotPasswordState(isLoading = true)
+            when (val result = authRepository.sendPasswordResetEmail(email)) {
+                is AuthResult.VerificationEmailSent ->
+                    _forgotState.value = ForgotPasswordState(emailSent = true)
+                is AuthResult.Error ->
+                    _forgotState.value = ForgotPasswordState(error = result.message)
+                else -> _forgotState.value = ForgotPasswordState(error = "Unexpected error")
+            }
+        }
     }
 
-    fun setGoogleError(message: String) {
-        _uiState.value = AuthUiState(error = message)
-    }
-
-    fun clearSuccess() {
-        _uiState.value = AuthUiState()
-    }
+    fun resetForgotState() { _forgotState.value = ForgotPasswordState() }
 }
 
 class AuthViewModelFactory(private val repo: AuthRepository) : ViewModelProvider.Factory {
@@ -84,4 +129,3 @@ class AuthViewModelFactory(private val repo: AuthRepository) : ViewModelProvider
         return AuthViewModel(repo) as T
     }
 }
-

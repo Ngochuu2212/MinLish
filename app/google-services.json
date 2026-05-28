@@ -46,6 +46,14 @@
           }
         },
         {
+          "client_id": "669124074977-ti0sjar47pmeq6rvajjv6flic73q24ne.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.english_app",
+            "certificate_hash": "1083a24b7333a492a4089e7768e9054775b77bc5"
+          }
+        },
+        {
           "client_id": "669124074977-6kj0v09n29i19cronkgl24n59unsi0hh.apps.googleusercontent.com",
           "client_type": 3
         }

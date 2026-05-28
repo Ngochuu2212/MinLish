@@ -1,5 +1,7 @@
 package com.example.english_app.ui.screens.vocabulary
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -15,8 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.english_app.data.local.entity.WordEntity
@@ -34,13 +37,40 @@ fun VocabularySetDetailScreen(
     onBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     var deleteWord by remember { mutableStateOf<WordEntity?>(null) }
+    var showImportDialog by remember { mutableStateOf(false) }
+    var showMoreMenu by remember { mutableStateOf(false) }
+
     LaunchedEffect(setId) { viewModel.loadSet(setId) }
+
+    // Import file picker (CSV / plain text / any)
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { viewModel.importFromCsv(context, it, setId) }
+    }
+
+    // Show result snackbar
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(uiState.importedCount) {
+        uiState.importedCount?.let { count ->
+            snackbarHostState.showSnackbar("✅ Imported $count words successfully!")
+            viewModel.clearImportResult()
+        }
+    }
+    LaunchedEffect(uiState.importError) {
+        uiState.importError?.let { err ->
+            snackbarHostState.showSnackbar(err)
+            viewModel.clearImportResult()
+        }
+    }
 
     val set = uiState.selectedSet
 
     Scaffold(
         containerColor = BgLight,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {},
@@ -50,8 +80,28 @@ fun VocabularySetDetailScreen(
                     }
                 },
                 actions = {
+                    // Edit set button
                     IconButton(onClick = onNavigateToEditSet) {
                         Icon(Icons.Default.Edit, null, tint = TextPrimary)
+                    }
+                    // More menu (Import / Export)
+                    Box {
+                        IconButton(onClick = { showMoreMenu = true }) {
+                            Icon(Icons.Default.MoreVert, null, tint = TextPrimary)
+                        }
+                        DropdownMenu(
+                            expanded = showMoreMenu,
+                            onDismissRequest = { showMoreMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("📥  Import CSV") },
+                                onClick = { showMoreMenu = false; showImportDialog = true }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("📤  Export CSV") },
+                                onClick = { showMoreMenu = false; viewModel.exportToCsv(context, setId) }
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BgLight)
@@ -85,17 +135,24 @@ fun VocabularySetDetailScreen(
             ) { Icon(Icons.Default.Add, "Add Word") }
         }
     ) { padding ->
+        // Loading overlay for import
+        if (uiState.isImporting) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = NavyPrimary)
+            }
+            return@Scaffold
+        }
+
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            // Header info
+            // ...existing code...
             item {
                 set?.let {
                     Text(it.name, fontSize = 24.sp, fontWeight = FontWeight.Bold,
                         color = TextPrimary, modifier = Modifier.padding(bottom = 10.dp))
 
-                    // Tags
                     if (it.tags.isNotBlank()) {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.padding(bottom = 14.dp)) {
@@ -114,7 +171,6 @@ fun VocabularySetDetailScreen(
                         }
                     }
 
-                    // Stats row
                     Row(horizontalArrangement = Arrangement.spacedBy(24.dp),
                         modifier = Modifier.padding(bottom = 20.dp)) {
                         Column {
@@ -137,7 +193,6 @@ fun VocabularySetDetailScreen(
                         }
                     }
 
-                    // Section header
                     Row(Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically) {
@@ -175,6 +230,7 @@ fun VocabularySetDetailScreen(
         }
     }
 
+    // Delete word dialog
     deleteWord?.let { word ->
         AlertDialog(
             onDismissRequest = { deleteWord = null },
@@ -186,6 +242,18 @@ fun VocabularySetDetailScreen(
                 }
             },
             dismissButton = { TextButton(onClick = { deleteWord = null }) { Text("Cancel") } }
+        )
+    }
+
+    // Import CSV dialog
+    if (showImportDialog) {
+        ImportCsvDialog(
+            onDismiss = { showImportDialog = false },
+            onDownloadTemplate = { viewModel.downloadTemplate(context) },
+            onPickFile = {
+                showImportDialog = false
+                importLauncher.launch("*/*")
+            }
         )
     }
 }
@@ -274,5 +342,81 @@ fun WordDetailItem(label: String, value: String) {
         Text("$label: ", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = NavyPrimary)
         Text(value, fontSize = 12.sp, color = TextPrimary)
     }
+}
+
+// ─────────────────────── Import CSV Dialog ────────────────────────────────────
+@Composable
+fun ImportCsvDialog(
+    onDismiss: () -> Unit,
+    onDownloadTemplate: () -> Unit,
+    onPickFile: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceWhite,
+        shape = RoundedCornerShape(20.dp),
+        title = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()) {
+                Text("📥  Import CSV", fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp, color = TextPrimary)
+                Spacer(Modifier.height(6.dp))
+                Text("Import words from a CSV file into this set.",
+                    fontSize = 13.sp, color = TextSecondary, textAlign = TextAlign.Center)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Format guide
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardBg),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("CSV Columns (in order):", fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold, color = NavyPrimary)
+                        listOf(
+                            "1. word ✳ required",
+                            "2. pronunciation",
+                            "3. meaning ✳ required",
+                            "4. description",
+                            "5. example",
+                            "6. collocation",
+                            "7. relatedWords",
+                            "8. note"
+                        ).forEach { col ->
+                            Text(col, fontSize = 11.sp, color = TextPrimary)
+                        }
+                    }
+                }
+                // Download template button
+                OutlinedButton(
+                    onClick = onDownloadTemplate,
+                    modifier = Modifier.fillMaxWidth().height(42.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = NavyPrimary)
+                ) {
+                    Icon(Icons.Default.FileDownload, null,
+                        modifier = Modifier.size(16.dp).padding(end = 4.dp))
+                    Text("Download Template (.csv)", fontSize = 13.sp)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onPickFile,
+                colors = ButtonDefaults.buttonColors(containerColor = NavyPrimary),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Icon(Icons.Default.FileUpload, null,
+                    modifier = Modifier.size(16.dp).padding(end = 4.dp))
+                Text("Choose CSV File")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) }
+        }
+    )
 }
 
