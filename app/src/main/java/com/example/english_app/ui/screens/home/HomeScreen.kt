@@ -4,8 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,9 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.example.english_app.data.local.entity.VocabularySetEntity
 import com.example.english_app.ui.theme.*
 
@@ -34,7 +34,23 @@ fun HomeScreen(
     onNavigateToSet: (Int) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val notifSettings by viewModel.notifSettings.collectAsState()
+    val context = LocalContext.current
+    var showNotifDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) { viewModel.loadData() }
+
+    if (showNotifDialog) {
+        NotificationSettingsDialog(
+            settings = notifSettings,
+            dueWords = uiState.dueWords,
+            onDismiss = { showNotifDialog = false },
+            onSave = { enabled, hour, minute ->
+                viewModel.saveNotificationSettings(context, enabled, hour, minute)
+                showNotifDialog = false
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -55,16 +71,38 @@ fun HomeScreen(
                 Text("Ready to expand your vocabulary?",
                     fontSize = 13.sp, color = TextSecondary, modifier = Modifier.padding(top = 2.dp))
             }
+            // Bell icon with red badge if due words > 0
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .size(40.dp)
                     .clip(CircleShape)
                     .background(CardBg)
-                    .clickable {},
+                    .clickable { showNotifDialog = true },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Outlined.Notifications, null, tint = TextPrimary, modifier = Modifier.size(20.dp))
+                if (uiState.dueWords > 0) {
+                    val badgeText = if (uiState.dueWords > 99) "99+" else "${uiState.dueWords}"
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(Color(0xFFE53935))
+                            .border(1.5.dp, Color.White, RoundedCornerShape(9.dp))
+                            .padding(horizontal = 3.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = badgeText,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White,
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
             }
         }
 
@@ -267,3 +305,162 @@ fun RecentSetRow(set: VocabularySetEntity, onClick: () -> Unit) {
     }
 }
 
+@Composable
+fun NotificationSettingsDialog(
+    settings: NotificationSettings,
+    dueWords: Int,
+    onDismiss: () -> Unit,
+    onSave: (enabled: Boolean, hour: Int, minute: Int) -> Unit
+) {
+    var enabled by remember { mutableStateOf(settings.enabled) }
+    var hour by remember { mutableStateOf(settings.hour) }
+    var minute by remember { mutableStateOf(settings.minute) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                // Title
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Notifications, null,
+                        tint = NavyPrimary, modifier = Modifier.size(24.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Notification Settings", fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold, color = TextPrimary)
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                // Due words info
+                if (dueWords > 0) {
+                    Card(
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("🔔", fontSize = 16.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Text("You have $dueWords words due for review",
+                                fontSize = 13.sp, color = Color(0xFFE65100))
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                }
+
+                // Enable toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Daily Reminder", fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                        Text("Remind me to study every day",
+                            fontSize = 12.sp, color = TextSecondary)
+                    }
+                    Switch(
+                        checked = enabled,
+                        onCheckedChange = { enabled = it },
+                        colors = SwitchDefaults.colors(checkedThumbColor = NavyPrimary,
+                            checkedTrackColor = Color(0xFFBBCCEE))
+                    )
+                }
+
+                // Time picker (only visible when enabled)
+                if (enabled) {
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider(color = Color(0xFFF0F0F0))
+                    Spacer(Modifier.height(16.dp))
+
+                    Text("Reminder Time", fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                    Spacer(Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Hour picker
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            IconButton(onClick = { hour = (hour + 1) % 24 }) {
+                                Icon(Icons.Default.KeyboardArrowUp, null, tint = NavyPrimary)
+                            }
+                            Text(
+                                text = "%02d".format(hour),
+                                fontSize = 32.sp, fontWeight = FontWeight.Bold, color = NavyPrimary
+                            )
+                            IconButton(onClick = { hour = (hour + 23) % 24 }) {
+                                Icon(Icons.Default.KeyboardArrowDown, null, tint = NavyPrimary)
+                            }
+                        }
+
+                        Text(":", fontSize = 32.sp, fontWeight = FontWeight.Bold,
+                            color = TextPrimary, modifier = Modifier.padding(horizontal = 12.dp))
+
+                        // Minute picker
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            IconButton(onClick = { minute = (minute + 5) % 60 }) {
+                                Icon(Icons.Default.KeyboardArrowUp, null, tint = NavyPrimary)
+                            }
+                            Text(
+                                text = "%02d".format(minute),
+                                fontSize = 32.sp, fontWeight = FontWeight.Bold, color = NavyPrimary
+                            )
+                            IconButton(onClick = { minute = (minute + 55) % 60 }) {
+                                Icon(Icons.Default.KeyboardArrowDown, null, tint = NavyPrimary)
+                            }
+                        }
+
+                        Spacer(Modifier.width(16.dp))
+
+                        // AM/PM hint
+                        Text(
+                            text = if (hour < 12) "AM" else "PM",
+                            fontSize = 16.sp, fontWeight = FontWeight.Bold,
+                            color = TextSecondary
+                        )
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Reminder set for %02d:%02d %s".format(
+                            hour, minute, if (hour < 12) "AM" else "PM"
+                        ),
+                        fontSize = 12.sp, color = TextSecondary,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                // Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) { Text("Cancel") }
+
+                    Button(
+                        onClick = { onSave(enabled, hour, minute) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = NavyPrimary)
+                    ) { Text("Save") }
+                }
+            }
+        }
+    }
+}

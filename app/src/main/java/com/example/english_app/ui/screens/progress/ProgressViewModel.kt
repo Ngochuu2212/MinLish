@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 data class ProgressUiState(
     val stats: ProgressStats = ProgressStats(0, 0, 0, 0, 0f, 0),
     val recentActivity: Map<String, Int> = emptyMap(),
+    val retentionByDay: List<Float?> = emptyList(),
     val level: String = "Beginner",
     val isLoading: Boolean = true
 )
@@ -34,10 +35,12 @@ class ProgressViewModel(
                 if (userId <= 0) return@collect
                 val stats = learningRepository.getStats(userId)
                 val activity = learningRepository.getRecentActivity(userId, 7)
+                val retention = learningRepository.getRetentionByDay(userId)
                 val level = estimateLevel(stats.learnedWords)
                 _uiState.value = ProgressUiState(
                     stats = stats,
                     recentActivity = activity,
+                    retentionByDay = retention,
                     level = level,
                     isLoading = false
                 )

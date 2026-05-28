@@ -142,7 +142,13 @@ fun AppNavigation(app: MinLishApp) {
                         app.authRepository, app.vocabularyRepository, app.learningRepository)),
                     onNavigateToLearn = { navController.navigate(Screen.Learn.route) },
                     onNavigateToDailyReview = { navController.navigate(Screen.DailyReview.route) },
-                    onNavigateToAllSets = { navController.navigate(Screen.VocabularyList.route) },
+                    onNavigateToAllSets = {
+                        navController.navigate(Screen.VocabularyList.route) {
+                            popUpTo(Screen.Home.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
                     onNavigateToSet = { setId -> navController.navigate(Screen.VocabularySetDetail.createRoute(setId)) }
                 )
             }

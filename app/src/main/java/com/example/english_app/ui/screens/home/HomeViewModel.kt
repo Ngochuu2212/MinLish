@@ -1,5 +1,6 @@
 package com.example.english_app.ui.screens.home
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -7,6 +8,7 @@ import com.example.english_app.data.local.entity.VocabularySetEntity
 import com.example.english_app.data.repository.AuthRepository
 import com.example.english_app.data.repository.LearningRepository
 import com.example.english_app.data.repository.VocabularyRepository
+import com.example.english_app.notification.DailyReminderWorker
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -23,6 +25,12 @@ data class HomeUiState(
     val isLoading: Boolean = true
 )
 
+data class NotificationSettings(
+    val enabled: Boolean = true,
+    val hour: Int = 8,
+    val minute: Int = 0
+)
+
 class HomeViewModel(
     private val authRepository: AuthRepository,
     private val vocabularyRepository: VocabularyRepository,
@@ -32,7 +40,13 @@ class HomeViewModel(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    init { loadData() }
+    private val _notifSettings = MutableStateFlow(NotificationSettings())
+    val notifSettings: StateFlow<NotificationSettings> = _notifSettings.asStateFlow()
+
+    init {
+        loadData()
+        loadNotificationSettings()
+    }
 
     fun loadData() {
         viewModelScope.launch {
@@ -56,6 +70,31 @@ class HomeViewModel(
                     recentSets = recentSets,
                     isLoading = false
                 )
+            }
+        }
+    }
+
+    private fun loadNotificationSettings() {
+        viewModelScope.launch {
+            combine(
+                authRepository.userPreferences.notifEnabled,
+                authRepository.userPreferences.notifHour,
+                authRepository.userPreferences.notifMinute
+            ) { enabled, hour, minute ->
+                NotificationSettings(enabled, hour, minute)
+            }.collect { settings ->
+                _notifSettings.value = settings
+            }
+        }
+    }
+
+    fun saveNotificationSettings(context: Context, enabled: Boolean, hour: Int, minute: Int) {
+        viewModelScope.launch {
+            authRepository.userPreferences.saveNotificationSettings(enabled, hour, minute)
+            if (enabled) {
+                DailyReminderWorker.schedule(context, hour, minute)
+            } else {
+                DailyReminderWorker.cancel(context)
             }
         }
     }

@@ -10,6 +10,7 @@ import com.example.english_app.domain.srs.SM2Algorithm
 import com.example.english_app.utils.DateUtils
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import java.util.Calendar
 
 data class WordWithRecord(
     val word: WordEntity,
@@ -107,6 +108,33 @@ class LearningRepository(
         val records = recordDao.getReviewedSince(userId, since)
         return records.groupBy { DateUtils.formatDisplay(it.lastReviewDate) }
             .mapValues { it.value.size }
+    }
+
+    /**
+     * Returns a list of 7 Float? values (Mon=0 … Sun=6).
+     * Each value is the accuracy (0f-1f) of words last reviewed on that day.
+     * Null means no reviews happened that day.
+     */
+    suspend fun getRetentionByDay(userId: Int): List<Float?> {
+        val since = DateUtils.daysAgo(7)
+        val records = recordDao.getReviewedSince(userId, since)
+        val byDay = Array<MutableList<LearningRecordEntity>>(7) { mutableListOf() }
+        records.forEach { record ->
+            if (record.lastReviewDate > 0) {
+                val cal = Calendar.getInstance().apply { timeInMillis = record.lastReviewDate }
+                // Calendar.DAY_OF_WEEK: Sun=1..Sat=7 → Mon=0..Sun=6
+                val dayIdx = (cal.get(Calendar.DAY_OF_WEEK) + 5) % 7
+                byDay[dayIdx].add(record)
+            }
+        }
+        return byDay.map { recs ->
+            if (recs.isEmpty()) null
+            else {
+                val total = recs.sumOf { it.totalReviews }
+                val correct = recs.sumOf { it.correctReviews }
+                if (total > 0) correct.toFloat() / total else null
+            }
+        }
     }
 }
 

@@ -19,7 +19,7 @@ sealed class AuthResult {
 
 class AuthRepository(
     private val userDao: UserDao,
-    private val userPreferences: UserPreferences
+    val userPreferences: UserPreferences
 ) {
     private val auth = FirebaseAuth.getInstance()
     val currentUserId: Flow<Int> = userPreferences.userId

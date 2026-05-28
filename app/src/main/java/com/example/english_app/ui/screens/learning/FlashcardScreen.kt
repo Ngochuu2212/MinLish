@@ -322,10 +322,6 @@ fun FlashCard(
             if (rotation <= 90f) {
                 // Front face
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    IconButton(onClick = {}, modifier = Modifier.align(Alignment.End)) {
-                        Icon(Icons.Default.Refresh, null, tint = TextSecondary, modifier = Modifier.size(18.dp))
-                    }
-                    Spacer(Modifier.height(16.dp))
                     Text(word, fontSize = 34.sp, fontWeight = FontWeight.Bold,
                         color = TextPrimary, textAlign = TextAlign.Center)
                     if (pronunciation.isNotBlank()) {
