@@ -65,6 +65,9 @@ class VocabularyRepository(
 
     suspend fun importWords(words: List<WordEntity>) = wordDao.insertAll(words)
 
+    suspend fun toggleBookmark(wordId: Int, isBookmarked: Boolean) =
+        wordDao.setBookmarked(wordId, isBookmarked)
+
     /** Lấy dailyWordCount của user để dùng cho daily review limit */
     suspend fun getUserDailyWordCount(userId: Int): Int =
         userDao.getDailyWordCount(userId) ?: 20

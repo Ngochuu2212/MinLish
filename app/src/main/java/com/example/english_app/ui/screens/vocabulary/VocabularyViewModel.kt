@@ -130,6 +130,13 @@ class VocabularyViewModel(
         }
     }
 
+    fun toggleBookmark(word: WordEntity) {
+        viewModelScope.launch {
+            val newValue = !word.isBookmarked
+            vocabularyRepository.toggleBookmark(word.id, newValue)
+        }
+    }
+
     fun deleteSet(set: VocabularySetEntity) {
         viewModelScope.launch {
             vocabularyRepository.deleteSet(set)

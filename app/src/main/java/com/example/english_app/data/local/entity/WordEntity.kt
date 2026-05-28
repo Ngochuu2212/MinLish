@@ -26,6 +26,7 @@ data class WordEntity(
     val collocation: String = "",
     val relatedWords: String = "",
     val note: String = "",
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val isBookmarked: Boolean = false
 )
 

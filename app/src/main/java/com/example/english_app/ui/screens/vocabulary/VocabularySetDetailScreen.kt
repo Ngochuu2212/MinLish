@@ -222,7 +222,8 @@ fun VocabularySetDetailScreen(
                     VocabWordRow(
                         word = word,
                         onEdit = { onNavigateToEditWord(word.id) },
-                        onDelete = { deleteWord = word }
+                        onDelete = { deleteWord = word },
+                        onToggleBookmark = { viewModel.toggleBookmark(word) }
                     )
                     Spacer(Modifier.height(1.dp))
                 }
@@ -259,8 +260,7 @@ fun VocabularySetDetailScreen(
 }
 
 @Composable
-fun VocabWordRow(word: WordEntity, onEdit: () -> Unit, onDelete: () -> Unit) {
-    var bookmarked by remember { mutableStateOf(false) }
+fun VocabWordRow(word: WordEntity, onEdit: () -> Unit, onDelete: () -> Unit, onToggleBookmark: () -> Unit = {}) {
     var expanded by remember { mutableStateOf(false) }
 
     Card(
@@ -290,13 +290,13 @@ fun VocabWordRow(word: WordEntity, onEdit: () -> Unit, onDelete: () -> Unit) {
                         modifier = Modifier.padding(top = 2.dp))
                 }
                 IconButton(
-                    onClick = { bookmarked = !bookmarked },
+                    onClick = { onToggleBookmark() },
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
-                        if (bookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                        if (word.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
                         null,
-                        tint = if (bookmarked) NavyPrimary else TextSecondary,
+                        tint = if (word.isBookmarked) NavyPrimary else TextSecondary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
