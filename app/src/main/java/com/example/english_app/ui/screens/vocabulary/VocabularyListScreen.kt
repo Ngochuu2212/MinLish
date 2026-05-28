@@ -26,10 +26,12 @@ fun VocabularyListScreen(
     viewModel: VocabularyViewModel,
     onNavigateToSet: (Int) -> Unit,
     onNavigateToAddSet: () -> Unit,
+    onNavigateToEditSet: (Int) -> Unit,
     onBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var deleteDialog by remember { mutableStateOf<VocabSetWithCount?>(null) }
+    var menuExpandedFor by remember { mutableStateOf<Int?>(null) } // setId của item đang mở menu
 
     Scaffold(
         containerColor = BgLight,
@@ -115,8 +117,31 @@ fun VocabularyListScreen(
                                 }
                             }
                         }
-                        IconButton(onClick = { deleteDialog = item }) {
-                            Icon(Icons.Default.MoreVert, null, tint = TextSecondary)
+                        Box {
+                            IconButton(onClick = { menuExpandedFor = item.set.id }) {
+                                Icon(Icons.Default.MoreVert, null, tint = TextSecondary)
+                            }
+                            DropdownMenu(
+                                expanded = menuExpandedFor == item.set.id,
+                                onDismissRequest = { menuExpandedFor = null }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Edit") },
+                                    leadingIcon = { Icon(Icons.Default.Edit, null, tint = NavyPrimary) },
+                                    onClick = {
+                                        menuExpandedFor = null
+                                        onNavigateToEditSet(item.set.id)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Delete", color = ErrorRed) },
+                                    leadingIcon = { Icon(Icons.Default.Delete, null, tint = ErrorRed) },
+                                    onClick = {
+                                        menuExpandedFor = null
+                                        deleteDialog = item
+                                    }
+                                )
+                            }
                         }
                     }
                 }

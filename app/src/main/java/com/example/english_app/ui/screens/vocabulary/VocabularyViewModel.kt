@@ -67,8 +67,8 @@ class VocabularyViewModel(
 
     fun loadWord(wordId: Int) {
         viewModelScope.launch {
-            // Find word from current list
-            val word = _uiState.value.words.find { it.id == wordId }
+            // Query DB trực tiếp theo wordId để không bị phụ thuộc vào danh sách words trong bộ nhớ
+            val word = vocabularyRepository.getWordById(wordId)
             _uiState.update { it.copy(selectedWord = word) }
         }
     }
@@ -123,6 +123,23 @@ class VocabularyViewModel(
     fun deleteSet(set: VocabularySetEntity) {
         viewModelScope.launch {
             vocabularyRepository.deleteSet(set)
+        }
+    }
+
+    fun updateSet(set: VocabularySetEntity, name: String, description: String, tags: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            if (name.isBlank()) {
+                _uiState.update { it.copy(error = "Set name cannot be empty") }
+                return@launch
+            }
+            val updated = set.copy(
+                name = name.trim(),
+                description = description.trim(),
+                tags = tags.trim()
+            )
+            vocabularyRepository.updateSet(updated)
+            _uiState.update { it.copy(selectedSet = updated, actionSuccess = true) }
+            onSuccess()
         }
     }
 

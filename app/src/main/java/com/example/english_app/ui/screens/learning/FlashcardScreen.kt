@@ -1,5 +1,8 @@
 package com.example.english_app.ui.screens.learning
 
+import android.content.Intent
+import android.net.Uri
+import android.speech.tts.TextToSpeech
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -14,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -21,13 +25,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.english_app.domain.srs.SM2Algorithm
 import com.example.english_app.ui.theme.*
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FlashcardScreen(
     setId: Int,
     viewModel: LearningViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToEditWord: (Int) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     LaunchedEffect(setId) { viewModel.startFlashcardSession(setId) }
@@ -38,6 +44,7 @@ fun FlashcardScreen(
         onFlip = { viewModel.flipCard() },
         onRate = { viewModel.rateWord(it) },
         onRestart = { viewModel.startFlashcardSession(setId) },
+        onNavigateToEditWord = onNavigateToEditWord,
         onBack = onBack
     )
 }
@@ -57,6 +64,7 @@ fun DailyReviewScreen(
         onFlip = { viewModel.flipCard() },
         onRate = { viewModel.rateWord(it) },
         onRestart = { viewModel.startDailyReview() },
+        onNavigateToEditWord = {},
         onBack = onBack
     )
 }
@@ -69,8 +77,34 @@ private fun FlashcardSessionScaffold(
     onFlip: () -> Unit,
     onRate: (Int) -> Unit,
     onRestart: () -> Unit,
+    onNavigateToEditWord: (Int) -> Unit,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
+
+    // ── Text-to-Speech setup ──────────────────────────────────────────────
+    var ttsReady by remember { mutableStateOf(false) }
+    val tts = remember {
+        TextToSpeech(context) { status ->
+            ttsReady = status == TextToSpeech.SUCCESS
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose { tts.shutdown() }
+    }
+    val speak: (String) -> Unit = { word ->
+        if (ttsReady) {
+            tts.language = Locale.ENGLISH
+            tts.speak(word, TextToSpeech.QUEUE_FLUSH, null, null)
+        }
+    }
+
+    // ── Search: mở Cambridge Dictionary ──────────────────────────────────
+    val searchWord: (String) -> Unit = { word ->
+        val uri = Uri.parse("https://dictionary.cambridge.org/dictionary/english/${Uri.encode(word)}")
+        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+    }
+
     Scaffold(
         containerColor = BgLight,
         topBar = {
@@ -131,12 +165,10 @@ private fun FlashcardSessionScaffold(
                         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Card counter
                         Text("Card ${uiState.currentIndex + 1} / ${uiState.sessionWords.size}",
                             fontSize = 13.sp, color = TextSecondary,
                             modifier = Modifier.padding(bottom = 12.dp))
 
-                        // The flashcard itself
                         FlashCard(
                             word = current.word.word,
                             pronunciation = current.word.pronunciation,
@@ -144,20 +176,18 @@ private fun FlashcardSessionScaffold(
                             example = current.word.example,
                             isFlipped = uiState.isFlipped,
                             onClick = onFlip,
+                            onSpeak = { speak(current.word.word) },
                             modifier = Modifier.weight(1f).fillMaxWidth()
                         )
 
                         Spacer(Modifier.height(12.dp))
 
                         if (!uiState.isFlipped) {
-                            // Tap to reveal hint
                             Text("TAP TO REVEAL ANSWER", fontSize = 11.sp, color = TextSecondary,
                                 letterSpacing = 0.5.sp, modifier = Modifier.padding(bottom = 12.dp))
                         }
 
-                        // Rating buttons
                         if (uiState.isFlipped) {
-                            // Interval hints row
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceEvenly
@@ -200,13 +230,13 @@ private fun FlashcardSessionScaffold(
 
                         Spacer(Modifier.height(12.dp))
 
-                        // Bottom search/edit row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            // Search → mở Cambridge Dictionary
                             OutlinedButton(
-                                onClick = {},
+                                onClick = { searchWord(current.word.word) },
                                 modifier = Modifier.weight(1f).height(40.dp),
                                 shape = RoundedCornerShape(10.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
@@ -215,8 +245,9 @@ private fun FlashcardSessionScaffold(
                                 Spacer(Modifier.width(4.dp))
                                 Text("Search", fontSize = 13.sp)
                             }
+                            // Edit Card → chuyển đến màn sửa từ
                             OutlinedButton(
-                                onClick = {},
+                                onClick = { onNavigateToEditWord(current.word.id) },
                                 modifier = Modifier.weight(1f).height(40.dp),
                                 shape = RoundedCornerShape(10.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
@@ -269,6 +300,7 @@ fun FlashCard(
     example: String,
     isFlipped: Boolean,
     onClick: () -> Unit,
+    onSpeak: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val rotation by animateFloatAsState(
@@ -301,12 +333,19 @@ fun FlashCard(
                         Text("/$pronunciation/", fontSize = 16.sp, color = TextSecondary)
                     }
                     Spacer(Modifier.height(20.dp))
+                    // Nút loa → đọc từ bằng TTS
                     Box(
-                        modifier = Modifier.size(44.dp).clip(RoundedCornerShape(50))
-                            .background(CardBg).border(1.dp, Color(0xFFDAE3F7), RoundedCornerShape(50)),
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(CardBg)
+                            .border(1.dp, Color(0xFFDAE3F7), RoundedCornerShape(50)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.VolumeUp, null, tint = NavyPrimary, modifier = Modifier.size(20.dp))
+                        IconButton(onClick = onSpeak, modifier = Modifier.size(44.dp)) {
+                            Icon(Icons.Default.VolumeUp, contentDescription = "Phát âm",
+                                tint = NavyPrimary, modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
             } else {

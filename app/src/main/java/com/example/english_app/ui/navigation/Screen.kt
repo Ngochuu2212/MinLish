@@ -9,6 +9,9 @@ sealed class Screen(val route: String) {
         fun createRoute(setId: Int) = "vocabulary_set/$setId"
     }
     object AddVocabularySet : Screen("add_vocabulary_set")
+    object EditVocabularySet : Screen("edit_vocabulary_set/{setId}") {
+        fun createRoute(setId: Int) = "edit_vocabulary_set/$setId"
+    }
     object AddWord : Screen("add_word/{setId}") {
         fun createRoute(setId: Int) = "add_word/$setId"
     }

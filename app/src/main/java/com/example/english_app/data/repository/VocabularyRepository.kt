@@ -51,6 +51,8 @@ class VocabularyRepository(
         return wordDao.insert(entity).toInt()
     }
 
+    suspend fun getWordById(id: Int): WordEntity? = wordDao.findById(id)
+
     suspend fun updateWord(word: WordEntity) = wordDao.update(word)
 
     suspend fun deleteWord(word: WordEntity) = wordDao.delete(word)

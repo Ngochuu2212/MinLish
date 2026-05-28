@@ -38,6 +38,7 @@ import com.example.english_app.ui.screens.profile.ProfileScreen
 import com.example.english_app.ui.screens.profile.ProfileViewModelFactory
 import com.example.english_app.ui.screens.vocabulary.AddVocabularySetScreen
 import com.example.english_app.ui.screens.vocabulary.AddWordScreen
+import com.example.english_app.ui.screens.vocabulary.EditVocabularySetScreen
 import com.example.english_app.ui.screens.vocabulary.EditWordScreen
 import com.example.english_app.ui.screens.vocabulary.VocabularyListScreen
 import com.example.english_app.ui.screens.vocabulary.VocabularySetDetailScreen
@@ -152,6 +153,7 @@ fun AppNavigation(app: MinLishApp) {
                         app.authRepository, app.vocabularyRepository, app.learningRepository)),
                     onNavigateToSet = { setId -> navController.navigate(Screen.VocabularySetDetail.createRoute(setId)) },
                     onNavigateToAddSet = { navController.navigate(Screen.AddVocabularySet.route) },
+                    onNavigateToEditSet = { setId -> navController.navigate(Screen.EditVocabularySet.createRoute(setId)) },
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -165,6 +167,7 @@ fun AppNavigation(app: MinLishApp) {
                     onNavigateToAddWord = { navController.navigate(Screen.AddWord.createRoute(setId)) },
                     onNavigateToEditWord = { wId -> navController.navigate(Screen.EditWord.createRoute(wId)) },
                     onNavigateToFlashcard = { navController.navigate(Screen.Flashcard.createRoute(setId)) },
+                    onNavigateToEditSet = { navController.navigate(Screen.EditVocabularySet.createRoute(setId)) },
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -178,6 +181,18 @@ fun AppNavigation(app: MinLishApp) {
                             popUpTo(Screen.AddVocabularySet.route) { inclusive = true }
                         }
                     },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.EditVocabularySet.route,
+                arguments = listOf(navArgument("setId") { type = NavType.IntType })) { back ->
+                val setId = back.arguments?.getInt("setId") ?: return@composable
+                EditVocabularySetScreen(
+                    setId = setId,
+                    viewModel = viewModel(factory = VocabularyViewModelFactory(
+                        app.authRepository, app.vocabularyRepository, app.learningRepository)),
+                    onSuccess = { navController.popBackStack() },
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -217,9 +232,13 @@ fun AppNavigation(app: MinLishApp) {
             composable(Screen.Flashcard.route,
                 arguments = listOf(navArgument("setId") { type = NavType.IntType })) { back ->
                 val setId = back.arguments?.getInt("setId") ?: return@composable
-                FlashcardScreen(setId = setId,
+                FlashcardScreen(
+                    setId = setId,
                     viewModel = viewModel(factory = LearningViewModelFactory(
                         app.authRepository, app.vocabularyRepository, app.learningRepository)),
+                    onNavigateToEditWord = { wordId ->
+                        navController.navigate(Screen.EditWord.createRoute(wordId))
+                    },
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -244,10 +263,9 @@ fun AppNavigation(app: MinLishApp) {
                 ProfileScreen(
                     viewModel = viewModel(factory = ProfileViewModelFactory(app.authRepository)),
                     onLogout = {
+                        // Chỉ gọi logout — LaunchedEffect(userId) sẽ tự navigate về Login
+                        // khi DataStore emit -1. Không navigate trực tiếp ở đây để tránh double navigation.
                         authViewModel.logout()
-                        navController.navigate(Screen.Login.route) {
-                            popUpTo(navController.graph.id) { inclusive = true }
-                        }
                     },
                     onBack = { navController.popBackStack() }
                 )

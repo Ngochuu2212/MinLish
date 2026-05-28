@@ -57,14 +57,25 @@ class LearningViewModel(
         }
     }
 
+    /**
+     * Trả về userId hợp lệ (>0).
+     * Nếu currentUserId chưa được set (vẫn là -1 do race condition với DataStore),
+     * sẽ chờ Flow emit giá trị hợp lệ trước khi tiếp tục.
+     */
+    private suspend fun awaitValidUserId(): Int {
+        if (currentUserId > 0) return currentUserId
+        return authRepository.currentUserId.first { it > 0 }
+    }
+
     fun startFlashcardSession(setId: Int) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            learningRepository.initializeWordsForUser(currentUserId, setId)
+            val uid = awaitValidUserId()
+            learningRepository.initializeWordsForUser(uid, setId)
             val words = vocabularyRepository.getWords(setId)
             val session = words.map { word ->
-                val existing = learningRepository.getDueSession(currentUserId, 200).find { it.word.id == word.id }
-                existing ?: WordWithRecord(word, LearningRecordEntity(wordId = word.id, userId = currentUserId))
+                val existing = learningRepository.getDueSession(uid, 200).find { it.word.id == word.id }
+                existing ?: WordWithRecord(word, LearningRecordEntity(wordId = word.id, userId = uid))
             }
             _uiState.update {
                 it.copy(
@@ -81,7 +92,8 @@ class LearningViewModel(
     fun startDailyReview() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val due = learningRepository.getDueSession(currentUserId, 20)
+            val uid = awaitValidUserId()
+            val due = learningRepository.getDueSession(uid, 20)
             _uiState.update {
                 it.copy(
                     sessionWords = due,
@@ -144,7 +156,3 @@ class LearningViewModelFactory(
         return LearningViewModel(authRepository, vocabularyRepository, learningRepository) as T
     }
 }
-
-
-
-

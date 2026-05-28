@@ -1,6 +1,11 @@
 package com.example.english_app.ui.screens.profile
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -14,9 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.english_app.ui.theme.*
 import kotlinx.coroutines.delay
 
@@ -29,6 +37,7 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val user = uiState.user
+    val context = LocalContext.current
 
     // Auto-clear "Profile saved" message after 3 seconds
     LaunchedEffect(uiState.saveSuccess) {
@@ -46,6 +55,13 @@ fun ProfileScreen(
     var goalExpanded by remember { mutableStateOf(false) }
     val levels = listOf("A1", "A2", "B1", "B2", "C1", "C2")
     val goals  = listOf("General", "IELTS", "TOEIC", "Business", "Travel", "Conversation")
+
+    // Image picker launcher
+    val avatarPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        uri?.let { viewModel.saveAvatar(context, it) }
+    }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         unfocusedBorderColor = Color(0xFFE5E7EB), focusedBorderColor = NavyPrimary
@@ -80,16 +96,66 @@ fun ProfileScreen(
                     .padding(vertical = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Box(
-                    modifier = Modifier.size(80.dp).clip(CircleShape).background(CardBg),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(user?.name?.firstOrNull()?.uppercase() ?: "?",
-                        fontSize = 32.sp, fontWeight = FontWeight.Bold, color = NavyPrimary)
+                // Avatar container với nút camera overlay
+                Box(contentAlignment = Alignment.BottomEnd) {
+                    Box(
+                        modifier = Modifier
+                            .size(88.dp)
+                            .clip(CircleShape)
+                            .background(CardBg)
+                            .border(2.dp, NavyPrimary.copy(alpha = 0.15f), CircleShape)
+                            .clickable {
+                                avatarPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (user?.avatarUri?.isNotBlank() == true) {
+                            // Hiển thị ảnh đã upload
+                            AsyncImage(
+                                model = user.avatarUri,
+                                contentDescription = "Avatar",
+                                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            // Hiển thị chữ cái đầu tên nếu chưa có ảnh
+                            Text(
+                                user?.name?.firstOrNull()?.uppercase() ?: "?",
+                                fontSize = 32.sp, fontWeight = FontWeight.Bold, color = NavyPrimary
+                            )
+                        }
+                    }
+                    // Nút camera nhỏ góc dưới-phải
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(NavyPrimary)
+                            .border(2.dp, SurfaceWhite, CircleShape)
+                            .clickable {
+                                avatarPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.CameraAlt, contentDescription = "Đổi ảnh",
+                            tint = Color.White, modifier = Modifier.size(15.dp)
+                        )
+                    }
                 }
+
                 Spacer(Modifier.height(10.dp))
                 Text(user?.name ?: "", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                 Text(user?.email ?: "", fontSize = 13.sp, color = TextSecondary)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Nhấn vào ảnh để thay đổi",
+                    fontSize = 11.sp, color = TextSecondary.copy(alpha = 0.7f)
+                )
             }
 
             Spacer(Modifier.height(12.dp))
@@ -158,6 +224,9 @@ fun ProfileScreen(
                     if (uiState.saveSuccess) {
                         Text("✓ Profile saved!", color = SuccessGreen, fontSize = 13.sp,
                             fontWeight = FontWeight.Medium)
+                    }
+                    if (uiState.error != null) {
+                        Text(uiState.error!!, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
                     }
 
                     Button(

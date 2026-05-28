@@ -30,6 +30,7 @@ fun VocabularySetDetailScreen(
     onNavigateToAddWord: () -> Unit,
     onNavigateToEditWord: (Int) -> Unit,
     onNavigateToFlashcard: () -> Unit,
+    onNavigateToEditSet: () -> Unit,
     onBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -49,7 +50,7 @@ fun VocabularySetDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* edit set */ }) {
+                    IconButton(onClick = onNavigateToEditSet) {
                         Icon(Icons.Default.Edit, null, tint = TextPrimary)
                     }
                 },
@@ -125,7 +126,14 @@ fun VocabularySetDetailScreen(
                         Column {
                             Text("DIFFICULTY", fontSize = 10.sp, color = TextSecondary,
                                 letterSpacing = 0.5.sp)
-                            Text("Medium", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            val wordCount = uiState.words.size
+                            val (difficultyLabel, difficultyColor) = when {
+                                wordCount <= 10 -> "Easy" to Color(0xFF4CAF50)
+                                wordCount <= 30 -> "Medium" to Color(0xFFFF9800)
+                                else -> "Hard" to Color(0xFFF44336)
+                            }
+                            Text(difficultyLabel, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                                color = difficultyColor)
                         }
                     }
 

@@ -48,6 +48,9 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
     fun logout() {
         viewModelScope.launch {
             authRepository.logout()
+            // Reset UI state sau khi logout để tránh LaunchedEffect(uiState.success)
+            // trong LoginScreen tự động gọi onLoginSuccess() khi màn hình Login được show lại
+            _uiState.value = AuthUiState()
         }
     }
 

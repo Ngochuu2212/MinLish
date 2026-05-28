@@ -1,5 +1,6 @@
 package com.example.english_app.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -15,6 +16,7 @@ data class UserEntity(
     val dailyWordCount: Int = 10,
     val createdAt: Long = System.currentTimeMillis(),
     val streak: Int = 0,
-    val lastStudyDate: Long = 0L
+    val lastStudyDate: Long = 0L,
+    @ColumnInfo(defaultValue = "") val avatarUri: String = ""
 )
 
