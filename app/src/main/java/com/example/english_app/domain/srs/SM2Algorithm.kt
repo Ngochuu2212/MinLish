@@ -51,7 +51,13 @@ object SM2Algorithm {
             }
         }
 
-        val nextReviewDate = DateUtils.addDays(System.currentTimeMillis(), newInterval)
+        // AGAIN (quality <= 1): keep card due immediately (same day review)
+        // HARD (quality == 2): schedule for tomorrow
+        // GOOD/EASY (quality >= 3): use SM2 interval
+        val nextReviewDate = when {
+            clampedQuality <= 1 -> System.currentTimeMillis() // due lại ngay
+            else -> DateUtils.addDays(System.currentTimeMillis(), newInterval)
+        }
 
         return ReviewResult(
             easeFactor = newEF,

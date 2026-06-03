@@ -45,7 +45,8 @@ fun FlashcardScreen(
         onRate = { viewModel.rateWord(it) },
         onRestart = { viewModel.startFlashcardSession(setId) },
         onNavigateToEditWord = onNavigateToEditWord,
-        onBack = onBack
+        onBack = onBack,
+        emptyMessage = "No words in this set yet.\nAdd some words to start learning!"
     )
 }
 
@@ -65,7 +66,8 @@ fun DailyReviewScreen(
         onRate = { viewModel.rateWord(it) },
         onRestart = { viewModel.startDailyReview() },
         onNavigateToEditWord = {},
-        onBack = onBack
+        onBack = onBack,
+        emptyMessage = "No cards due today!\nCome back tomorrow to review\nyour scheduled words. 🎉"
     )
 }
 
@@ -78,7 +80,8 @@ private fun FlashcardSessionScaffold(
     onRate: (Int) -> Unit,
     onRestart: () -> Unit,
     onNavigateToEditWord: (Int) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    emptyMessage: String = "No words due for review right now."
 ) {
     val context = LocalContext.current
 
@@ -158,7 +161,7 @@ private fun FlashcardSessionScaffold(
             when {
                 uiState.isLoading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
                 uiState.isSessionComplete -> SessionCompleteScreen(uiState.sessionStats, onRestart, onBack)
-                uiState.sessionWords.isEmpty() -> EmptySessionScreen(onBack)
+                uiState.sessionWords.isEmpty() -> EmptySessionScreen(onBack, emptyMessage)
                 else -> {
                     val current = uiState.sessionWords[uiState.currentIndex]
                     Column(
@@ -413,14 +416,23 @@ fun StatRow(label: String, value: String, valueColor: Color = TextPrimary) {
 }
 
 @Composable
-fun EmptySessionScreen(onBack: () -> Unit) {
+fun EmptySessionScreen(
+    onBack: () -> Unit,
+    message: String = "No words due for review right now."
+) {
     Column(modifier = Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         Text("🎊", fontSize = 64.sp)
         Spacer(Modifier.height(16.dp))
         Text("All caught up!", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-        Text("No words due for review right now.", color = TextSecondary,
-            modifier = Modifier.padding(top = 8.dp), fontSize = 14.sp)
+        Text(
+            text = message,
+            color = TextSecondary,
+            modifier = Modifier.padding(top = 8.dp),
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center,
+            lineHeight = 20.sp
+        )
         Spacer(Modifier.height(24.dp))
         OutlinedButton(onClick = onBack, shape = RoundedCornerShape(12.dp)) {
             Text("Go Back")

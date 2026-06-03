@@ -42,6 +42,17 @@ class LearningRepository(
         }
     }
 
+    /** Khởi tạo learning records cho TẤT CẢ từ của user (dùng khi mở Daily Review) */
+    suspend fun initializeAllWordsForUser(userId: Int) {
+        val allWords = wordDao.getAllByUserId(userId)
+        allWords.forEach { word ->
+            val existing = recordDao.findByWordAndUser(word.id, userId)
+            if (existing == null) {
+                recordDao.insert(LearningRecordEntity(wordId = word.id, userId = userId))
+            }
+        }
+    }
+    // Các từ đến giới hạn ôn
     suspend fun getDueSession(userId: Int, limit: Int = 20): List<WordWithRecord> {
         val now = System.currentTimeMillis()
         val due = recordDao.getDueWords(userId, now).take(limit)
@@ -50,7 +61,7 @@ class LearningRepository(
             WordWithRecord(word, record)
         }
     }
-
+    //  các từ chưa học lần nào
     suspend fun getNewWordsSession(userId: Int, limit: Int = 10): List<WordWithRecord> {
         val newRecords = recordDao.getNewWords(userId).take(limit)
         return newRecords.mapNotNull { record ->

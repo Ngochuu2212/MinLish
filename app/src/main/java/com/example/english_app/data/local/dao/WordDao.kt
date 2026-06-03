@@ -33,6 +33,9 @@ interface WordDao {
     @Query("SELECT COUNT(*) FROM words WHERE setId IN (SELECT id FROM vocabulary_sets WHERE userId = :userId)")
     suspend fun countByUserId(userId: Int): Int
 
+    @Query("SELECT * FROM words WHERE setId IN (SELECT id FROM vocabulary_sets WHERE userId = :userId)")
+    suspend fun getAllByUserId(userId: Int): List<WordEntity>
+
     @Query("UPDATE words SET isBookmarked = :isBookmarked WHERE id = :wordId")
     suspend fun setBookmarked(wordId: Int, isBookmarked: Boolean)
 }

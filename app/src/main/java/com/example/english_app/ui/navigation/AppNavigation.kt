@@ -267,7 +267,7 @@ fun AppNavigation(app: MinLishApp) {
 
             composable(Screen.Profile.route) {
                 ProfileScreen(
-                    viewModel = viewModel(factory = ProfileViewModelFactory(app.authRepository)),
+                    viewModel = viewModel(factory = ProfileViewModelFactory(app.authRepository, app.learningRepository)),
                     onLogout = {
                         // Chỉ gọi logout — LaunchedEffect(userId) sẽ tự navigate về Login
                         // khi DataStore emit -1. Không navigate trực tiếp ở đây để tránh double navigation.

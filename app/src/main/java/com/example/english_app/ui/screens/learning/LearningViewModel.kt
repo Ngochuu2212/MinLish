@@ -81,7 +81,7 @@ class LearningViewModel(
                 it.copy(
                     sessionWords = session.shuffled(),
                     currentIndex = 0, isFlipped = false,
-                    isSessionComplete = session.isEmpty(),
+                    isSessionComplete = false, // Let EmptySessionScreen handle empty case
                     sessionStats = SessionStats(total = session.size),
                     isLoading = false
                 )
@@ -93,6 +93,8 @@ class LearningViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val uid = awaitValidUserId()
+            // Khởi tạo records cho tất cả từ chưa có record (từ mới thêm vào set)
+            learningRepository.initializeAllWordsForUser(uid)
             // Dùng dailyWordCount của user nếu có, mặc định 20
             val dailyLimit = try {
                 vocabularyRepository.getUserDailyWordCount(uid)
@@ -103,7 +105,7 @@ class LearningViewModel(
                     sessionWords = due,
                     currentIndex = 0,
                     isFlipped = false,
-                    isSessionComplete = due.isEmpty(),
+                    isSessionComplete = false, // Let EmptySessionScreen handle 0-cards case
                     sessionStats = SessionStats(total = due.size),
                     isLoading = false
                 )

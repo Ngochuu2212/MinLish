@@ -49,11 +49,8 @@ fun ProfileScreen(
 
     var name by remember(user) { mutableStateOf(user?.name ?: "") }
     var goal by remember(user) { mutableStateOf(user?.learningGoal ?: "General") }
-    var level by remember(user) { mutableStateOf(user?.level ?: "A1") }
     var dailyCount by remember(user) { mutableStateOf(user?.dailyWordCount?.toString() ?: "10") }
-    var levelExpanded by remember { mutableStateOf(false) }
     var goalExpanded by remember { mutableStateOf(false) }
-    val levels = listOf("A1", "A2", "B1", "B2", "C1", "C2")
     val goals  = listOf("General", "IELTS", "TOEIC", "Business", "Travel", "Conversation")
 
     // Image picker launcher
@@ -195,21 +192,24 @@ fun ProfileScreen(
                         }
                     }
 
-                    ExposedDropdownMenuBox(expanded = levelExpanded, onExpandedChange = { levelExpanded = it }) {
-                        OutlinedTextField(
-                            value = level, onValueChange = {}, readOnly = true,
-                            label = { Text("Current Level") },
-                            leadingIcon = { Icon(Icons.Default.Grade, null, tint = TextSecondary, modifier = Modifier.size(20.dp)) },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = levelExpanded) },
-                            modifier = Modifier.menuAnchor().fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp), colors = fieldColors
-                        )
-                        ExposedDropdownMenu(expanded = levelExpanded, onDismissRequest = { levelExpanded = false }) {
-                            levels.forEach { l ->
-                                DropdownMenuItem(text = { Text(l) }, onClick = { level = l; levelExpanded = false })
-                            }
-                        }
-                    }
+                    // Current Level — chỉ đọc, tính tự động từ số từ đã học
+                    OutlinedTextField(
+                        value = uiState.computedLevel,
+                        onValueChange = {},
+                        readOnly = true,
+                        enabled = false,
+                        label = { Text("Current Level") },
+                        leadingIcon = { Icon(Icons.Default.Grade, null, tint = TextSecondary, modifier = Modifier.size(20.dp)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            disabledBorderColor = Color(0xFFE5E7EB),
+                            disabledLabelColor = TextSecondary,
+                            disabledTextColor = TextPrimary,
+                            disabledLeadingIconColor = TextSecondary
+                        ),
+                        suffix = { Text("auto", color = NavyPrimary.copy(alpha = 0.6f), fontSize = 11.sp) }
+                    )
 
                     OutlinedTextField(
                         value = dailyCount,
@@ -230,7 +230,7 @@ fun ProfileScreen(
                     }
 
                     Button(
-                        onClick = { viewModel.updateProfile(name, goal, level, dailyCount.toIntOrNull() ?: 10) },
+                        onClick = { viewModel.updateProfile(name, goal, dailyCount.toIntOrNull() ?: 10) },
                         enabled = !uiState.isSaving,
                         modifier = Modifier.fillMaxWidth().height(48.dp),
                         shape = RoundedCornerShape(12.dp),
